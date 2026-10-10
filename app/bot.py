@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import time
 import uuid
 from pathlib import Path
 
@@ -64,6 +65,8 @@ if IS_OLLAMA:
     OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').strip().rstrip('/')
     # PM 단계 입력(발언 8개)이 Ollama 기본 컨텍스트를 넘으면 앞부분이 조용히 잘린다
     OLLAMA_NUM_CTX = positive_int_env('OLLAMA_NUM_CTX', 8192)
+    OLLAMA_STARTUP_WAIT_SECONDS = positive_int_env('OLLAMA_STARTUP_WAIT_SECONDS', 120)
+    OLLAMA_RETRY_INTERVAL_SECONDS = 5
     llm = httpx.AsyncClient(base_url=OLLAMA_BASE_URL, timeout=LLM_TIMEOUT_SECONDS)
 else:
     MODEL = os.getenv('OPENAI_MODEL', 'gpt-4.1-mini')
@@ -115,11 +118,18 @@ async def ask_ollama(instructions, prompt, max_output_tokens):
 
 def check_ollama_ready():
     """봇 시작 전에 Ollama 서버 연결과 모델 설치 여부를 확인한다."""
-    try:
-        tags_response = httpx.get(f'{OLLAMA_BASE_URL}/api/tags', timeout=5)
-        tags_response.raise_for_status()
-    except httpx.HTTPError:
-        raise SystemExit(f'Ollama 서버에 연결할 수 없습니다: {OLLAMA_BASE_URL} (Ollama 앱 실행 여부 확인)')
+    # 로그인 직후에는 Ollama 앱이 아직 뜨지 않았을 수 있어 연결 실패만 일정 시간 재시도한다
+    wait_deadline = time.monotonic() + OLLAMA_STARTUP_WAIT_SECONDS
+    while True:
+        try:
+            tags_response = httpx.get(f'{OLLAMA_BASE_URL}/api/tags', timeout=5)
+            tags_response.raise_for_status()
+            break
+        except httpx.HTTPError:
+            if time.monotonic() >= wait_deadline:
+                raise SystemExit(f'Ollama 서버에 연결할 수 없습니다: {OLLAMA_BASE_URL} (Ollama 앱 실행 여부 확인)')
+            log.info('Ollama 서버 대기 중: %s', OLLAMA_BASE_URL)
+            time.sleep(OLLAMA_RETRY_INTERVAL_SECONDS)
     installed_models = {model['name'] for model in tags_response.json().get('models', [])}
     if MODEL not in installed_models and f'{MODEL}:latest' not in installed_models:
         raise SystemExit(f'Ollama 모델이 설치되지 않았습니다. 먼저 실행: ollama pull {MODEL}')

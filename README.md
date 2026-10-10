@@ -50,7 +50,10 @@ tests/
 scripts/
   setup.ps1         원클릭 설치 (Python·venv·패키지·.env·Ollama 모델·테스트)
   run.ps1           봇 실행 (미설치 시 setup 먼저)
+  autostart.ps1     로그인 자동 실행용 (중복 실행 방지, 비정상 종료 시 재시작)
+  autostart-install.ps1 / autostart-uninstall.ps1   시작프로그램 바로가기 등록·해제
 setup.cmd, run.cmd  더블클릭 실행용 래퍼 (실행 정책 우회)
+autostart-install.cmd, autostart-uninstall.cmd   자동 실행 등록·해제 래퍼
 .env.example        설정 템플릿 (항목별 한글 주석)
 Dockerfile, compose.yaml
 ```
@@ -70,6 +73,16 @@ Dockerfile, compose.yaml
 3. **`run.cmd` 더블클릭.** 봇이 시작된다. 설정이 빠졌거나 Ollama가 꺼져 있으면 원인을 출력하고 종료한다.
 
 `setup.cmd`는 여러 번 실행해도 안전하다. 모델을 바꾼 뒤에도 다시 실행하면 새 모델을 내려받는다.
+
+### 로그인 시 자동 실행 (Windows)
+
+- **등록:** `autostart-install.cmd`를 더블클릭한다. 시작프로그램 폴더에 바로가기(`DiscordPlanningBot.lnk`)가 생기고, 다음 로그인부터 봇이 최소화 창으로 실행된다. 관리자 권한은 필요 없다.
+- **해제:** `autostart-uninstall.cmd`를 더블클릭한다. 이미 실행 중인 봇은 종료되지 않으므로 봇 창을 직접 닫는다.
+- **종료:** 작업 표시줄의 최소화된 봇 창을 닫으면 봇도 종료된다.
+- **Ollama 대기:** 봇이 Ollama 앱보다 먼저 시작되면 `OLLAMA_STARTUP_WAIT_SECONDS`(기본 120초) 동안 연결을 다시 시도한다.
+- **자동 재시작:** 네트워크 끊김 등으로 비정상 종료하면 10초에서 최대 60초까지 대기 시간을 늘리며 다시 시작한다. 60초 안에 5번 연속 종료되면 설정 오류로 보고 멈춘 뒤, 원인을 볼 수 있도록 창을 열어 둔다.
+- **중복 실행 방지:** 자동 실행 중에 `run.cmd`를 실행하면 "이미 실행 중"을 안내하고 종료한다.
+- **폴더 이동:** 바로가기에 현재 폴더 경로가 저장된다. 프로젝트 폴더를 옮기면 `autostart-install.cmd`를 다시 실행한다.
 
 ### 수동 설치 (Windows PowerShell)
 
@@ -172,6 +185,7 @@ cp -n .env.example .env
 | `LLM_PROVIDER` | `ollama` | `ollama` 또는 `openai` |
 | `OLLAMA_MODEL` | `gemma3:4b` | 바꾸면 먼저 `ollama pull` |
 | `OLLAMA_NUM_CTX` | `8192` | 컨텍스트 길이. 8192 미만이면 PM 단계 입력이 잘릴 수 있다 |
+| `OLLAMA_STARTUP_WAIT_SECONDS` | `120` | 시작 시 Ollama 서버 연결을 기다리는 최대 시간 |
 | `MEETING_IN_THREAD` | `false` | `true`면 회의마다 별도 스레드를 만든다 |
 | `LLM_TIMEOUT_SECONDS` | ollama 600 / openai 90 | 모델 호출 1회의 제한 시간 |
 | `MEETING_TIMEOUT_SECONDS` | ollama 1800 / openai 900 | 회의 1건 전체의 제한 시간 |
