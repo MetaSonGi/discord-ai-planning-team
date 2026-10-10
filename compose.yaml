@@ -1,0 +1,12 @@
+services:
+  team:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    # 컨테이너에서 호스트 PC의 Ollama 접속용 (OLLAMA_BASE_URL=http://host.docker.internal:11434)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - meetings:/app/data
+volumes:
+  meetings:
